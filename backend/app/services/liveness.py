@@ -26,7 +26,7 @@ class LivenessDetector:
         self.frame_buffer = []
         self.max_buffer_size = 5
         self.blink_threshold = 0.25
-        self.texture_threshold = 80.0  # Laplacian variance threshold
+        self.texture_threshold = 40.0  # Lowered from 80.0 to be more lenient with camera noise
 
     def check_single_frame(self, image):
         """
@@ -60,10 +60,10 @@ class LivenessDetector:
             return False, skin_msg
 
         # Check 4: Reflection/glare detection
-        # Printed photos often have glare spots
+        # Printed photos often have glare spots. Check only in face region.
         has_glare = self._check_glare(image)
         if has_glare:
-            return False, "Possible printed photo detected (glare)"
+            return False, "Possible printed photo detected (glare in face region)"
 
         return True, "Liveness check passed"
 
@@ -189,24 +189,39 @@ class LivenessDetector:
 
         skin_ratio = np.sum(mask > 0) / (mask.shape[0] * mask.shape[1])
 
-        # Real faces should have at least 20% skin-colored pixels
-        if skin_ratio < 0.15:
+        # Real faces should have some skin-colored pixels. 
+        # Lowered threshold to 5% to be more lenient with lighting/complexions
+        if skin_ratio < 0.05:
             return False, "Skin color distribution abnormal"
 
         return True, "Skin color OK"
 
     def _check_glare(self, image):
         """
-        Check for glare/reflection spots that indicate a printed photo or screen.
+        Check for glare/reflection spots specifically in the face region.
         """
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        from .face_detection import FaceDetector
+        detector = FaceDetector()
+        faces = detector.detect_faces(image)
+
+        if not faces:
+            return False  # No face, no glare to check
+
+        x, y, w, h = faces[0]
+        face_region = image[y:y+h, x:x+w]
+
+        if face_region.size == 0:
+            return False
+
+        gray_face = cv2.cvtColor(face_region, cv2.COLOR_BGR2GRAY)
 
         # Find very bright spots
-        _, bright = cv2.threshold(gray, 250, 255, cv2.THRESH_BINARY)
+        _, bright = cv2.threshold(gray_face, 250, 255, cv2.THRESH_BINARY)
         bright_ratio = np.sum(bright > 0) / (bright.shape[0] * bright.shape[1])
 
-        # High ratio of very bright pixels suggests glare
-        return bright_ratio > 0.05
+        # High ratio of very bright pixels in the face suggests glare
+        # Increased from 0.05 to 0.15 to allow for normal highlights
+        return bright_ratio > 0.15
 
     @staticmethod
     def compute_ear(eye_points):

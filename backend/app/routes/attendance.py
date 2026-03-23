@@ -160,6 +160,7 @@ def mark_attendance():
             recognized = fr_service.recognize_faces(img, all_embeddings)
 
             if not recognized:
+                print("DEBUG: No face recognized in the image.")
                 return jsonify({
                     'message': 'No face detected',
                     'results': [],
@@ -210,6 +211,7 @@ def mark_attendance():
                     class_id=data.get('class_id', student.class_id),
                 )
                 db.session.add(record)
+                print(f"DEBUG: Successfully recognized {student.name} (ID: {student.student_id}) with confidence {face['confidence']:.2f}")
                 results.append({
                     'recognized': True,
                     'student': student.to_dict(),

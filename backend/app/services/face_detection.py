@@ -94,7 +94,7 @@ class FaceDetector:
             gray,
             scaleFactor=1.1,
             minNeighbors=5,
-            minSize=(60, 60),
+            minSize=(40, 40),
             flags=cv2.CASCADE_SCALE_IMAGE,
         )
 
